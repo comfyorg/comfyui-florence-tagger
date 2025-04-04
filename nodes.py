@@ -158,18 +158,21 @@ class Tagger:
 
                     file_names.append(cap_filename)
         else:
-            if len(images) == 1:
-                images = [images]
-
             to_pil = transforms.ToPILImage()
+
+            # Handle batched tensor input: (N, H, W, C) or (N, C, H, W)
+            if isinstance(images, torch.Tensor):
+                if images.ndim == 4:
+                    if images.shape[-1] in [1, 3, 4]:  # (N, H, W, C)
+                        images = images.permute(0, 3, 1, 2)  # -> (N, C, H, W)
+                    images = list(images)  # Split batch into list of images
+                elif images.ndim == 3:
+                    images = [images]  # Single image (C, H, W)
+
             max_digits = max(3, len(str(len(images))))
 
             for i, img in enumerate(images, start=1):
-                if img.ndim == 4:
-                    # Convert (N, H, W, C) to (N, C, H, W)
-                    img = img.permute(0, 3, 1, 2).squeeze(0)
-
-                if img.ndim == 3 and img.shape[0] in [1, 3, 4]:
+                if img.ndim == 3 and img.shape[0] in [1, 3, 4]:  # (C, H, W)
                     pil_img = to_pil(img.cpu())
                     pil_images.append(pil_img)
 
@@ -177,11 +180,14 @@ class Tagger:
                     tensor_img = tensor_img[:3, :, :].unsqueeze(0).permute(0, 2, 3, 1).cpu().float()
                     tensor_images.append(tensor_img)
 
-                if filenames is None:
-                    cap_filename = f"{i:0{max_digits}d}.txt"
+                    if filenames is None:
+                        cap_filename = f"{i:0{max_digits}d}.txt"
+                    elif isinstance(filenames, list):
+                        cap_filename = filenames[i - 1]
+                    else:
+                        cap_filename = filenames
+
                     file_names.append(cap_filename)
-                else:
-                    file_names.append(filenames)
 
         pbar = ProgressBar(len(pil_images))
 
