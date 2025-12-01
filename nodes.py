@@ -114,6 +114,7 @@ class Tagger:
         tag_contents = []
         pil_images = []
         tensor_images = []
+        attention = 'sdpa'
         precision = 'fp16'
 
         device = mm.get_torch_device()
