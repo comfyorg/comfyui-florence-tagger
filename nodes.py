@@ -100,6 +100,7 @@ class Tagger:
             early_stopping=False,
             do_sample=do_sample,
             num_beams=num_beams,
+            use_cache=False,
         )
         generated_text = processor.batch_decode(generated_ids, skip_special_tokens=False)[0]
         parsed_answer = processor.post_process_generation(
@@ -114,7 +115,6 @@ class Tagger:
         tag_contents = []
         pil_images = []
         tensor_images = []
-        attention = 'sdpa'
         precision = 'fp16'
 
         device = mm.get_torch_device()
@@ -137,8 +137,13 @@ class Tagger:
 
         with patch("transformers.dynamic_module_utils.get_imports",
                    fixed_get_imports):  # workaround for unnecessary flash_attn requirement
-            model = AutoModelForCausalLM.from_pretrained(model_path, attn_implementation=attention, device_map=device,
-                                                         torch_dtype=dtype, trust_remote_code=True).to(device)
+            model = AutoModelForCausalLM.from_pretrained(
+                model_path, 
+                device_map=device,
+                dtype=dtype, 
+                trust_remote_code=True,
+                attn_implementation="eager"
+            ).to(device)
 
         # Load the processor
         processor = AutoProcessor.from_pretrained(model_path, trust_remote_code=True)
