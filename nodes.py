@@ -1,11 +1,11 @@
-import os, sys
+import os, string
 from PIL import Image
 import torch
 from unittest.mock import patch
 from transformers.dynamic_module_utils import get_imports
 import torchvision.transforms.functional as F
 from torchvision import transforms
-from transformers import AutoModelForCausalLM, AutoProcessor
+from transformers import AutoModelForCausalLM, AutoProcessor, GenerationMixin, GenerationConfig
 
 import comfy.model_management as mm
 from comfy.utils import ProgressBar
@@ -144,6 +144,18 @@ class Tagger:
                 trust_remote_code=True,
                 attn_implementation="eager"
             ).to(device)
+
+        if hasattr(model, "language_model") and not isinstance(model.language_model, GenerationMixin):
+            print("Patching Florence2LanguageForConditionalGeneration to inherit from GenerationMixin")
+            model.language_model.__class__.__bases__ = (GenerationMixin,) + model.language_model.__class__.__bases__
+        
+        if hasattr(model, "language_model") and (not hasattr(model.language_model, "generation_config") or model.language_model.generation_config is None):
+            print("Initializing generation_config for Florence2LanguageForConditionalGeneration")
+            try:
+                model.language_model.generation_config = GenerationConfig.from_pretrained(model_path)
+            except Exception as e:
+                print(f"Failed to load generation config: {e}. Creating default.")
+                model.language_model.generation_config = GenerationConfig()
 
         # Load the processor
         processor = AutoProcessor.from_pretrained(model_path, trust_remote_code=True)
